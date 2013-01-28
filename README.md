@@ -52,8 +52,8 @@ Overview
       Channels A and B are pulled up to Vcc with 2.7[kOhm] resistors.
    
 
-   Note the pinouts to the Encoder: they're different from before!!
-   Connecting Elements: 
+    Note the pinouts to the Encoder: they're different from before!!
+    Connecting Elements: 
      Encoder:            Arduino:  
       Channel A            Digital pin 2 ---> interrupt 0
       Channel B            Digital pin 3 ---> interrupt 1  
