@@ -1,6 +1,9 @@
 Arduino-Based Quadrature-Rotary-Encoder Decryption
 ==============================================
 
+For the full tutorial, see the link below:  
+https://sites.google.com/site/hmcfabstudio/tutorials/digital-electronics/optical-rotary-encoders
+
 Overview
 --------
 
