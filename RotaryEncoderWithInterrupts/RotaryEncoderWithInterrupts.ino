@@ -1,98 +1,153 @@
-// Stepper Acceleration Test
-// Joshua Vasquez
-// August 19, 2014
-
-#include <math.h>
-
-unsigned int stepperAccel = 200;    // steps per rev per rev
-unsigned int totalSteps = 200;
-
-#define FULL_STEP 0
-#define HALF_STEP 4
-#define QUARTER_STEP 5
-#define EIGHTH_STEP 6
-#define SIXTEENTH_STEP 7
+/*  
+Joshua Vasquez
+Rotary Encoder With Interrupts
+Augst 19, 2014
+*/
 
 
-/* PINOUTS */
-const int MS1 = 11;
-const int MS2 = 12;
-const int MS3 = 13;
-const int DIR = 4;
-const int STEP = 5;
-const int outputPins[5] = {MS1, MS2, MS3, DIR, STEP};
+// Global Variables. 
+volatile unsigned char prevState;  // to deduce rotational direction.
+volatile long index = 0;    
 
 
-void setUStepFactor( unsigned int ustep)
-{
-  digitalWrite(MS1, (0x01 & ustep));
-  digitalWrite(MS2, ((0x02 & ustep) >> 1));
-  digitalWrite(MS3, ((0x04 & ustep) >> 2));
-}
+long prev_index = 0;
+long curr_index = 0;
+int displacement;
 
-void step(boolean clockwise)
-{
-  if (clockwise)
-     digitalWrite(DIR, HIGH);
-     
-  digitalWrite(STEP, HIGH);
-  delayMicroseconds(1);
-  digitalWrite(STEP, LOW);
-  digitalWrite(DIR, LOW);
-  delayMicroseconds(1);
-}
-
-unsigned long computeT(unsigned int x, unsigned int accel)
-{
-  return (unsigned long)(1000000 * sqrt( (2 * x) / ( (float)accel)));
-}
-
+// Table with interrupt numbers available at:
+// http://arduino.cc/en/Reference/attachInterrupt
+// interrupt pin numbers below are Leonardo-Specific.
+const int int0Pin = 3; 
+const int int1Pin = 2;
 
 void setup()
-{
-  Serial.begin(9600); // baud rate irrelevant for Leonardo.
+{ 
+  Serial.begin(57600);
   delay(3000);
-  Serial.println("Hello, world!");
+  interrupts();
   
-  for (int i = 0; i < 5; ++i)
-    pinMode(outputPins[i], OUTPUT);
-    
-  setUStepFactor(FULL_STEP);
+// read interrupts to deduce initial state.
+  unsigned int state = (digitalRead(int1Pin) << 1) | digitalRead(int0Pin);  // verify this!
+  switch (state)
+  {
+    case 0:
+      prevState = 0;
+      attachInterrupt(0,State_1 , RISING);
+      attachInterrupt(1,State_3 , RISING);
+      break;
+    case 1:
+      prevState = 1; 
+      attachInterrupt(0, State_0 , FALLING);
+      attachInterrupt(1, State_2 , RISING);
+      break;
+    case 2:
+      prevState = 2;
+      attachInterrupt(0, State_3 , FALLING);
+      attachInterrupt(1, State_1 , FALLING);
+      break;
+    case 3:
+      prevState = 3;
+      attachInterrupt(0, State_2 , RISING);
+      attachInterrupt(1, State_0 , FALLING);
+      break;
+  }
 }
+
+void State_0()
+{ 
+// detach the existing interrupts and reassign new conditions.
+  detachInterrupt(0); detachInterrupt(1); 
+  switch (prevState)
+  {
+    case 3:
+      index++;
+      // Clockwise = true;
+      break;
+    case 1:
+      index--;
+      // Clockwise = false;
+      break;
+    default:
+      Serial.println("Error");
+      // should never happen unless we skip indices.
+  }
+  prevState = 0;
+  attachInterrupt(0,State_1 , RISING);
+  attachInterrupt(1,State_3 , RISING);
+}
+
+void State_1()
+{
+  detachInterrupt(0); detachInterrupt(1);  
+  switch( prevState)
+  {
+    case 0:
+      index++;
+      // Clockwise = true;
+      break;
+    case 2:
+      index--;
+      // Clockwise = false;
+      break;
+    default:
+      Serial.println("Error");
+  }
+  prevState = 1;
+  attachInterrupt(0, State_0 , FALLING);
+  attachInterrupt(1, State_2 , RISING);
+
+}
+
+void State_2()
+{
+  detachInterrupt(0); detachInterrupt(1);  
+  switch (prevState)
+  {
+    case 1:
+      index++;
+      // Clockwise = true;
+      break;
+    case 3:
+      index--;
+      // Clockwise = false;
+      break;
+    default:
+      Serial.println("Error");
+  }
+  prevState = 2;
+  attachInterrupt(0, State_3 , FALLING);
+  attachInterrupt(1, State_1 , FALLING);
+
+}
+
+void State_3()
+{
+  detachInterrupt(0); detachInterrupt(1);  
+  switch (prevState)
+  {
+    case 2:
+      index++;
+      // Clockwise = true;
+      break;
+    case 0:
+      index--;
+      // Clockwise = false;
+      break;
+    default:
+      Serial.println("Error");  
+  }
+  prevState = 3;
+  attachInterrupt(0, State_2 , RISING);
+  attachInterrupt(1, State_0 , FALLING);
+}
+
+
+
 
 void loop()
 {
-
-  unsigned long delayTime = 0;
-  unsigned long lastDelayTime = 0;
-  unsigned int currStep = 0;
-  delay(3000);
-  
-
-  while (currStep < totalSteps)
-  {
-    delayTime = computeT(currStep, stepperAccel);
-    ++currStep;
-    //Serial.println(delayTime - lastDelayTime);
-    step(true);
-    delayMicroseconds(delayTime - lastDelayTime);
-    lastDelayTime = delayTime;
-  }  
-    while (currStep > 0)
-  {
-    --currStep;  // avoid overflow by subtracting first
-    delayTime = computeT(currStep, stepperAccel);
-    Serial.println(lastDelayTime - delayTime);
-    step(true);
-    delayMicroseconds(lastDelayTime - delayTime);
-    lastDelayTime = delayTime;
-  }  
-
-/*
-  for (int i = 0; i < 100; ++i)
-  {
-    step(true);
-    delayMicroseconds(50);
-  }
-*/
+  // Prints the index at the specified interval. 
+  delay(10);
+  Serial.println(index);
 }
+
